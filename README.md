@@ -207,11 +207,12 @@ aus der App ohne Area-Kontext.
 Was verifiziert ist:
 
 - `ruff check` und `ruff format` sind sauber
-- 23 Unit-Tests für Ranking und Namens-Matching laufen grün
+- 42 Tests laufen grün: Ranking und Namens-Matching als reine Logik, dazu zehn
+  Tool-Tests gegen ein echtes `hass` — Config Entry, LLM-API-Registrierung,
+  Tool-Aufruf, Service-Call und Antwort komplett durch
 - HACS-Validierung und hassfest laufen in CI durch
-- In CI wird das Paket mit installiertem Home Assistant importiert (aktuell
-  2026.2.3, die Version die `pytest-homeassistant-custom-component` mitbringt) —
-  die Importkette bis `homeassistant.helpers.llm` trägt also
+- Getestet gegen Home Assistant 2026.2.3 (die Version, die
+  `pytest-homeassistant-custom-component` mitbringt)
 - Die verwendeten Signaturen (`llm.API`, `llm.Tool`, `llm.APIInstance`,
   `ToolInput`, `LLMContext`) und die Feldnamen der `music_assistant.*`-Actions
   sind gegen den HA-Core-Stand (`dev`, August 2026) geprüft

@@ -69,6 +69,10 @@ _FILLER_WORDS = frozenset(
         "auf",
         "zum",
         "zur",
+        # "&" normalizes to nothing, so dropping the spoken "und" makes
+        # "Kack- und Sachgeschichten" and "Kack & Sachgeschichten" identical.
+        "und",
+        "and",
     }
 )
 
@@ -116,6 +120,18 @@ def core_form(text: str) -> str:
     """
     words = [word for word in tokenize(text) if word not in _FILLER_WORDS]
     return " ".join(words) if words else normalize(text)
+
+
+def ampersand_variant(text: str) -> str:
+    """Spell the German "und" back as "&" for provider search.
+
+    Speech-to-text writes what was said: "Kack- und Sachgeschichten". The
+    library writes the title: "Kack & Sachgeschichten". Returns an empty string
+    when there is nothing to swap.
+    """
+    variant = re.sub(r"-\s+und\s+", " und ", text, flags=re.IGNORECASE)
+    variant = re.sub(r"\s+und\s+", " & ", variant, flags=re.IGNORECASE)
+    return variant if variant != text else ""
 
 
 def strip_query_filler(text: str) -> str:

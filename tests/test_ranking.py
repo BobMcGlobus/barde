@@ -2,7 +2,9 @@
 
 from custom_components.barde.ranking import (
     Candidate,
+    filter_by_name,
     flatten,
+    from_library,
     is_uri,
     provider_of,
     rank,
@@ -182,4 +184,46 @@ def test_search_attempts_strip_filler_words_last() -> None:
         ("Hazbin Hotel Songs", "track", None),
         ("Hazbin Hotel Songs", None, None),
         ("Hazbin Hotel", None, None),
+    ]
+
+
+def test_search_attempts_add_the_ampersand_spelling() -> None:
+    assert search_attempts("Kack- und Sachgeschichten", None, None) == [
+        ("Kack- und Sachgeschichten", None, None),
+        ("Kack & Sachgeschichten", None, None),
+    ]
+
+
+def test_search_attempts_are_deduplicated() -> None:
+    attempts = search_attempts("Rumours", None, None)
+    assert attempts == [("Rumours", None, None)]
+
+
+def test_from_library_reads_items() -> None:
+    candidates = from_library(
+        {
+            "items": [
+                {"name": "Kack & Sachgeschichten", "uri": "abs://podcast/1"},
+                {"name": "KREWKAST", "uri": "abs://podcast/2"},
+            ]
+        },
+        "podcast",
+    )
+    assert [candidate.name for candidate in candidates] == [
+        "Kack & Sachgeschichten",
+        "KREWKAST",
+    ]
+    assert candidates[0].media_type == "podcast"
+
+
+def test_filter_by_name_keeps_only_plausible_hits() -> None:
+    candidates = [
+        _candidate("Kack & Sachgeschichten", "podcast"),
+        _candidate("Kack & Sachgeschichten Premium", "podcast"),
+        _candidate("Nerd & Kultur", "podcast"),
+    ]
+    hits = filter_by_name(candidates, "Kack- und Sachgeschichten")
+    assert [hit.name for hit in hits] == [
+        "Kack & Sachgeschichten",
+        "Kack & Sachgeschichten Premium",
     ]

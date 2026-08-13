@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.2 — unveröffentlicht
+
+**Fix: `AttributeError: 'ComputedNameType' object has no attribute 'casefold'`.**
+`RegistryEntry.aliases` ist inzwischen `str | ComputedNameType` — der Sentinel
+`COMPUTED_NAME` steht dort als Platzhalter für den berechneten Entity-Namen und
+landete ungefiltert im Namensvergleich. Aliase werden jetzt über
+`er.async_get_entity_aliases()` aufgelöst (mit Rückfallebene für ältere Cores),
+und alles, was kein String ist, fliegt raus.
+
+**Fix: Podcasts und Hörbücher wurden nicht gefunden.** Die Provider-Suche
+findet „Kack- und Sachgeschichten" nicht, weil die Folge „Kack & Sachgeschichten"
+heißt. Beide Enden sind jetzt bedacht:
+
+- Bei `media_type=podcast`/`audiobook` wird zuerst die **Bibliothek** abgefragt
+  und lokal fuzzy verglichen — dort leben diese Titel, und der Vergleich auf
+  unserer Seite verträgt „und" statt „&"
+- Findet eine Anfrage ohne Typ gar nichts, wird die Bibliothek als letzter
+  Versuch ebenfalls durchsucht
+- Die Suchkaskade probiert zusätzlich die „&"-Schreibweise
+- Neues Modul `finder.py`, das sich `musik_abspielen` und `musik_suchen` teilen
+
 ## 0.1.1 — unveröffentlicht
 
 **Fix: Assist brach hart ab (`intent-failed`), sobald ein Tool lief.**

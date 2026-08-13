@@ -251,6 +251,86 @@ async def test_search_returns_audiobooks(hass: HomeAssistant, barde) -> None:
     assert result["treffer"][0]["quelle"] == "audiobookshelf"
 
 
+def _register_library(
+    hass: HomeAssistant, items_by_type: dict[str, list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Register a fake music_assistant.get_library."""
+    calls: list[dict[str, Any]] = []
+
+    async def handler(call: ServiceCall) -> dict[str, Any]:
+        calls.append(dict(call.data))
+        return {"items": items_by_type.get(call.data["media_type"], [])}
+
+    hass.services.async_register(
+        MA_DOMAIN, "get_library", handler, supports_response=SupportsResponse.ONLY
+    )
+    return calls
+
+
+async def test_podcast_is_found_in_the_library_despite_the_spoken_und(
+    hass: HomeAssistant, barde
+) -> None:
+    """The reported failure: "Kack- und Sachgeschichten" vs "Kack & …"."""
+    _register_search(hass, [])
+    _register_library(
+        hass,
+        {
+            "podcast": [
+                {"name": "Kack & Sachgeschichten", "uri": "abs://podcast/1"},
+                {"name": "Kack & Sachgeschichten Premium", "uri": "abs://podcast/2"},
+                {"name": "KREWKAST", "uri": "abs://podcast/3"},
+            ]
+        },
+    )
+    played = async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass,
+        "musik_abspielen",
+        query="Kack- und Sachgeschichten",
+        media_type="podcast",
+        player="Wohnzimmer",
+    )
+
+    assert result["gespielt"] == "Kack & Sachgeschichten"
+    assert result["typ"] == "podcast"
+    assert played[0].data["media_id"] == "abs://podcast/1"
+
+
+async def test_untyped_request_falls_back_to_the_spoken_word_library(
+    hass: HomeAssistant, barde
+) -> None:
+    _register_search(hass, [])
+    _register_library(
+        hass, {"podcast": [{"name": "KREWKAST", "uri": "abs://podcast/3"}]}
+    )
+    async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Krewkast", player="Wohnzimmer"
+    )
+
+    assert result["gespielt"] == "KREWKAST"
+
+
+async def test_computed_name_alias_does_not_break_matching(
+    hass: HomeAssistant, barde
+) -> None:
+    """entry.aliases may hold the COMPUTED_NAME sentinel instead of a string."""
+    computed = getattr(er, "COMPUTED_NAME", None)
+    if computed is None:
+        pytest.skip("this core has no COMPUTED_NAME aliases")
+    er.async_get(hass).async_update_entity(PLAYER, aliases={computed, "Büro"})
+    _register_search(hass, [ALBUM_HIT])
+    async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Hazbin Hotel", player="Büro"
+    )
+
+    assert result["gespielt"] == "Hazbin Hotel"
+
+
 async def test_control_steps_the_volume(hass: HomeAssistant, barde) -> None:
     hass.states.async_set(
         PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.4}

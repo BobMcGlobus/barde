@@ -2,6 +2,7 @@
 
 from custom_components.barde.matching import (
     MATCH_THRESHOLD,
+    ampersand_variant,
     best_match,
     core_form,
     match_score,
@@ -67,6 +68,30 @@ def test_strip_query_filler_keeps_original_spelling() -> None:
 
 def test_strip_query_filler_can_empty_the_query() -> None:
     assert strip_query_filler("irgendwas Musik") == ""
+
+
+def test_spoken_und_matches_an_ampersand_title() -> None:
+    # "Spiele Kack- und Sachgeschichten" against the library title.
+    assert match_score("Kack- und Sachgeschichten", "Kack & Sachgeschichten") == 1.0
+
+
+def test_ampersand_title_prefers_the_plain_entry_over_premium() -> None:
+    candidates = {
+        "plain": ["Kack & Sachgeschichten"],
+        "premium": ["Kack & Sachgeschichten Premium"],
+    }
+    match = best_match("Kack- und Sachgeschichten", candidates)
+    assert match is not None
+    assert match[0] == "plain"
+
+
+def test_ampersand_variant_rewrites_spoken_und() -> None:
+    assert ampersand_variant("Kack- und Sachgeschichten") == "Kack & Sachgeschichten"
+    assert ampersand_variant("Simon und Garfunkel") == "Simon & Garfunkel"
+
+
+def test_ampersand_variant_is_empty_without_und() -> None:
+    assert ampersand_variant("Rumours") == ""
 
 
 def test_best_match_prefers_exact_over_substring() -> None:

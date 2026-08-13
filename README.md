@@ -104,6 +104,13 @@ auch ohne Angabe mitgesucht — Provider wie **Audiobookshelf** kommen damit ohn
 Extrabehandlung durch. Im Ranking stehen sie unter der Musik, damit „spiel
 Rumours" weiterhin das Album trifft und nicht ein gleichnamiges Hörbuch.
 
+Für diese beiden Typen fragt Barde zuerst die **Bibliothek** ab statt die
+Provider-Suche. Dort leben sie, und der Namensvergleich passiert dann lokal —
+das ist der Unterschied zwischen „spiel Kack- und Sachgeschichten" (so kommt es
+aus der Spracherkennung) und „Kack & Sachgeschichten" (so heißt es in der
+Bibliothek). Die Provider-Suche findet das nicht, ein Fuzzy-Vergleich auf
+unserer Seite schon.
+
 ### Wenn die Suche nichts findet
 
 Sprachanfragen tragen Rauschen, das die Bibliothek nicht kennt. Statt sofort
@@ -115,6 +122,8 @@ bei leerem Ergebnis, jeder Schritt kostet eine Runde:
 3. ohne `artist` (Music Assistant baut daraus `"Künstler - Titel"`, ein
    falscher Credit killt die Suche)
 4. ohne Füllwörter: „Hazbin Hotel Songs" → „Hazbin Hotel"
+5. mit „&" statt „und": „Simon und Garfunkel" → „Simon & Garfunkel"
+6. zuletzt die Bibliothek nach Podcasts und Hörbüchern
 
 ### Fehlerverhalten
 

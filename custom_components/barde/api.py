@@ -31,6 +31,7 @@ from .const import (
     MAX_PROMPT_PLAYERS,
 )
 from .context import LibraryContext
+from .finder import MediaFinder
 from .ma import MusicAssistantBridge
 from .resolver import label, ma_players
 from .tools import build_tools
@@ -64,6 +65,7 @@ class BardeRuntime:
         self.ma_entry_id = ma_entry_id
         self.ma = MusicAssistantBridge(hass, ma_entry_id)
         self.library = LibraryContext(self)
+        self.finder = MediaFinder(self)
 
     def _option(self, key: str, default: Any) -> Any:
         return self.entry.options.get(key, self.entry.data.get(key, default))

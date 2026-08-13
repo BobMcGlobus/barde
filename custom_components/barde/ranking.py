@@ -12,7 +12,13 @@ from dataclasses import dataclass
 import re
 from typing import Any
 
-from .matching import match_score, normalize, strip_query_filler
+from .matching import (
+    MATCH_THRESHOLD,
+    ampersand_variant,
+    match_score,
+    normalize,
+    strip_query_filler,
+)
 
 # Response bucket -> media type. Music Assistant returns one list per type.
 RESULT_BUCKETS: dict[str, str] = {
@@ -123,6 +129,33 @@ def _to_candidate(item: Any, fallback_type: str) -> Candidate | None:
     )
 
 
+def from_library(
+    response: Mapping[str, Any] | None, media_type: str
+) -> list[Candidate]:
+    """Turn a ``music_assistant.get_library`` response into candidates."""
+    if not response:
+        return []
+    items = response.get("items") or []
+    if not isinstance(items, Sequence) or isinstance(items, str | bytes):
+        return []
+    candidates = [_to_candidate(item, media_type) for item in items]
+    return [candidate for candidate in candidates if candidate is not None]
+
+
+def filter_by_name(
+    candidates: Sequence[Candidate],
+    query: str,
+    threshold: float = MATCH_THRESHOLD,
+) -> list[Candidate]:
+    """Keep the candidates whose name plausibly matches, best first."""
+    scored = [
+        (match_score(query, candidate.name), candidate) for candidate in candidates
+    ]
+    hits = [pair for pair in scored if pair[0] >= threshold]
+    hits.sort(key=lambda pair: pair[0], reverse=True)
+    return [candidate for _, candidate in hits]
+
+
 def rank(
     candidates: Sequence[Candidate],
     query: str,
@@ -170,19 +203,21 @@ def search_attempts(
 
     Voice queries carry noise the library does not: a media type the model
     guessed ("Hazbin Hotel Songs" as a *track*), an artist that is not credited
-    that way, or words like "Songs" that belong to the sentence rather than to
-    the title. Each of those gets dropped in turn — the caller only runs the
-    next attempt when the previous one came back empty.
+    that way, words like "Songs" that belong to the sentence rather than to the
+    title, or a spoken "und" where the title has "&". Each of those gets
+    dropped in turn — the caller only runs the next attempt when the previous
+    one came back empty.
     """
     attempts: list[tuple[str, str | None, str | None]] = [(query, media_type, artist)]
     if media_type:
         attempts.append((query, None, artist))
     if artist:
         attempts.append((query, None, None))
-    cleaned = strip_query_filler(query)
-    if cleaned and cleaned != query:
-        attempts.append((cleaned, None, None))
-    return attempts
+    for variant in (strip_query_filler(query), ampersand_variant(query)):
+        if variant and variant != query:
+            attempts.append((variant, None, None))
+    # Dropping two things can arrive at the same search twice.
+    return list(dict.fromkeys(attempts))
 
 
 def _artist_bonus(candidate: Candidate, artist: str | None) -> int:

@@ -7,17 +7,10 @@ from typing import Any
 from homeassistant.helpers import llm
 import voluptuous as vol
 
-from ..const import DEFAULT_SEARCH_LIMIT, ENQUEUE_MODES, MEDIA_TYPES
+from ..const import ENQUEUE_MODES, MEDIA_TYPES
 from ..exceptions import NothingFound
 from ..ma import async_media_player
-from ..ranking import (
-    Candidate,
-    flatten,
-    is_uri,
-    provider_of,
-    rank,
-    search_attempts,
-)
+from ..ranking import Candidate, is_uri, provider_of
 from ..resolver import label, resolve_player
 from .base import BardeTool
 
@@ -72,7 +65,7 @@ class PlayTool(BardeTool):
             )
             alternatives = 0
         else:
-            ranked = await self._async_search_with_fallbacks(query, media_type, artist)
+            ranked = await runtime.finder.async_find(query, media_type, artist)
             if not ranked:
                 raise NothingFound(
                     f"Nichts gefunden für '{query}'"
@@ -104,40 +97,3 @@ class PlayTool(BardeTool):
         if chosen.artist:
             result["künstler"] = chosen.artist
         return result
-
-    async def _async_search_with_fallbacks(
-        self, query: str, media_type: str | None, artist: str | None
-    ) -> list[Candidate]:
-        """Search as asked, then loosen the request instead of giving up.
-
-        Every retry costs a round trip to Music Assistant, so the next attempt
-        only runs when the previous one came back empty.
-        """
-        for attempt_query, attempt_type, attempt_artist in search_attempts(
-            query, media_type, artist
-        ):
-            ranked = await self._async_search(
-                attempt_query, attempt_type, attempt_artist
-            )
-            if ranked:
-                return ranked
-        return []
-
-    async def _async_search(
-        self, query: str, media_type: str | None, artist: str | None
-    ) -> list[Candidate]:
-        """Run one search and rank what comes back."""
-        runtime = self.runtime
-        response = await runtime.ma.search(
-            query,
-            media_types=[media_type] if media_type else MEDIA_TYPES,
-            artist=artist,
-            limit=DEFAULT_SEARCH_LIMIT,
-        )
-        return rank(
-            flatten(response),
-            query,
-            media_type=media_type,
-            provider_preference=runtime.provider_preference,
-            artist=artist,
-        )

@@ -97,25 +97,38 @@ def area_name(hass: HomeAssistant, area_id: str | None) -> str | None:
     return area.name if area else None
 
 
+def _entity_aliases(hass: HomeAssistant, entry: er.RegistryEntry) -> list[str]:
+    """User aliases of an entity, as plain strings.
+
+    ``entry.aliases`` may contain the ``COMPUTED_NAME`` sentinel instead of a
+    string — it stands for "the entity's computed name". Newer cores resolve
+    that for us; on older ones there is nothing to resolve.
+    """
+    resolve = getattr(er, "async_get_entity_aliases", None)
+    if resolve is not None:
+        return resolve(hass, entry)
+    return [alias for alias in entry.aliases if isinstance(alias, str)]
+
+
 def aliases_of(hass: HomeAssistant, entity_id: str) -> list[str]:
     """Every name this player can plausibly be called by."""
     names: list[str] = []
     registry = er.async_get(hass)
     entry = registry.async_get(entity_id)
     if entry:
-        names.extend(entry.aliases)
-        if entry.name:
-            names.append(entry.name)
-        if entry.original_name:
-            names.append(entry.original_name)
+        names.extend(_entity_aliases(hass, entry))
+        names.append(entry.name)
+        names.append(entry.original_name)
     state = hass.states.get(entity_id)
-    if state and (friendly := state.attributes.get("friendly_name")):
-        names.append(str(friendly))
+    if state:
+        names.append(state.attributes.get("friendly_name"))
     area_id = area_id_of(hass, entity_id)
     if area_id and (area := ar.async_get(hass).async_get_area(area_id)):
         names.append(area.name)
         names.extend(area.aliases)
-    return [name for name in names if name]
+    # Anything that is not a real string would blow up in the matcher, and a
+    # crash in here aborts the whole voice run.
+    return [name for name in names if isinstance(name, str) and name.strip()]
 
 
 def label(runtime: BardeRuntime, entity_id: str) -> str:

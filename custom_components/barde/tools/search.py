@@ -8,7 +8,6 @@ from homeassistant.helpers import llm
 import voluptuous as vol
 
 from ..const import MEDIA_TYPES
-from ..ranking import flatten, rank
 from .base import BardeTool
 
 
@@ -40,23 +39,13 @@ class SearchTool(BardeTool):
     async def _run(self, llm_context: llm.LLMContext, **kwargs: Any) -> dict[str, Any]:
         runtime = self.runtime
         query: str = kwargs["query"]
-        media_type: str | None = kwargs.get("media_type")
-        artist: str | None = kwargs.get("artist")
         limit: int = kwargs.get("limit", 5)
 
-        response = await runtime.ma.search(
+        ranked = await runtime.finder.async_find(
             query,
-            media_types=[media_type] if media_type else MEDIA_TYPES,
-            artist=artist,
-            limit=max(limit, 10),
+            media_type=kwargs.get("media_type"),
+            artist=kwargs.get("artist"),
             library_only=kwargs.get("library_only", False),
-        )
-        ranked = rank(
-            flatten(response),
-            query,
-            media_type=media_type,
-            provider_preference=runtime.provider_preference,
-            artist=artist,
         )
         return {
             "treffer": [candidate.as_dict() for candidate in ranked[:limit]],

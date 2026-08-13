@@ -1,10 +1,9 @@
 {
   "domain": "barde",
   "name": "Barde",
-  "after_dependencies": ["music_assistant"],
+  "after_dependencies": ["conversation", "media_player", "music_assistant"],
   "codeowners": ["@BobMcGlobus"],
   "config_flow": true,
-  "dependencies": ["conversation", "media_player"],
   "documentation": "https://github.com/BobMcGlobus/barde",
   "integration_type": "service",
   "iot_class": "calculated",

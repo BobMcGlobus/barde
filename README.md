@@ -225,9 +225,11 @@ Getestet gegen: _(hier die HA-Version eintragen, sobald es lief)_.
 
 ## Abweichungen vom Plan
 
-- **`manifest.json`**: `music_assistant` steht unter `after_dependencies`, nicht
-  unter `dependencies`. So startet Barde auch, wenn MA (noch) fehlt, und meldet
-  einen verständlichen Fehler, statt gar nicht zu laden.
+- **`manifest.json`**: `music_assistant`, `conversation` und `media_player`
+  stehen unter `after_dependencies`, nicht unter `dependencies`. Barde
+  registriert nur eine LLM-API in der Registry und ruft Services auf — es muss
+  keine dieser Komponenten hochfahren. So startet Barde auch, wenn MA (noch)
+  fehlt, und meldet einen verständlichen Fehler, statt gar nicht zu laden.
 - **Zusätzliche Module**: `matching.py` und `ranking.py` enthalten die reine
   Logik ohne HA-Importe (dadurch ohne laufendes `hass` testbar), `ma.py` kapselt
   die Service-Calls, `exceptions.py` die Fehlertypen.

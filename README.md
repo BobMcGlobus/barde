@@ -180,6 +180,10 @@ Was verifiziert ist:
 
 - `ruff check` und `ruff format` sind sauber
 - 23 Unit-Tests für Ranking und Namens-Matching laufen grün
+- HACS-Validierung und hassfest laufen in CI durch
+- In CI wird das Paket mit installiertem Home Assistant importiert (aktuell
+  2026.2.3, die Version die `pytest-homeassistant-custom-component` mitbringt) —
+  die Importkette bis `homeassistant.helpers.llm` trägt also
 - Die verwendeten Signaturen (`llm.API`, `llm.Tool`, `llm.APIInstance`,
   `ToolInput`, `LLMContext`) und die Feldnamen der `music_assistant.*`-Actions
   sind gegen den HA-Core-Stand (`dev`, August 2026) geprüft

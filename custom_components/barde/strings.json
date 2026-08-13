@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Barde",
+        "description": "Barde adds Music Assistant tools to your conversation agent. Enable the LLM API \"Barde\" in the agent options afterwards (Settings → Voice assistants → your agent)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Barde is already set up.",
+      "music_assistant_missing": "Music Assistant is not set up. Add the Music Assistant integration first."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Barde options",
+        "data": {
+          "default_player": "Default speaker",
+          "expose_playlists": "Put playlist names in the prompt",
+          "expose_favorites": "Put favourite artists in the prompt",
+          "context_ttl": "Library cache (minutes)",
+          "volume_step": "Volume step (percentage points)",
+          "provider_preference": "Provider preference",
+          "respect_exposure": "Only control speakers exposed to Assist",
+          "ma_config_entry_id": "Music Assistant instance"
+        },
+        "data_description": {
+          "default_player": "Used when no room can be derived from the request.",
+          "expose_playlists": "Makes \"play the cooking playlist\" work without a search.",
+          "context_ttl": "How long playlist and favourite names are cached.",
+          "volume_step": "Applied by the 'lauter' and 'leiser' actions.",
+          "provider_preference": "Order used to break ties between equally good hits.",
+          "ma_config_entry_id": "Only needed if you run more than one Music Assistant instance."
+        }
+      }
+    }
+  }
+}

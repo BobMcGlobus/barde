@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Barde",
+        "description": "Barde gibt deinem Conversation-Agent Werkzeuge für Music Assistant. Aktiviere danach die LLM-API \"Barde\" in den Agent-Optionen (Einstellungen → Sprachassistenten → dein Agent)."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Barde ist bereits eingerichtet.",
+      "music_assistant_missing": "Music Assistant ist nicht eingerichtet. Bitte zuerst die Music-Assistant-Integration hinzufügen."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Barde-Optionen",
+        "data": {
+          "default_player": "Standard-Lautsprecher",
+          "expose_playlists": "Playlist-Namen in den Prompt aufnehmen",
+          "expose_favorites": "Lieblingskünstler in den Prompt aufnehmen",
+          "context_ttl": "Bibliotheks-Cache (Minuten)",
+          "volume_step": "Lautstärkeschritt (Prozentpunkte)",
+          "provider_preference": "Bevorzugte Quellen",
+          "respect_exposure": "Nur zu Assist freigegebene Lautsprecher steuern",
+          "ma_config_entry_id": "Music-Assistant-Instanz"
+        },
+        "data_description": {
+          "default_player": "Wird genommen, wenn sich kein Raum aus der Anfrage ableiten lässt.",
+          "expose_playlists": "Damit funktioniert \"leg die Kochmusik auf\" ohne Suche.",
+          "context_ttl": "Wie lange Playlist- und Favoritennamen zwischengespeichert werden.",
+          "volume_step": "Gilt für die Aktionen 'lauter' und 'leiser'.",
+          "provider_preference": "Reihenfolge, wenn mehrere Treffer gleich gut passen.",
+          "ma_config_entry_id": "Nur nötig, wenn mehr als eine Music-Assistant-Instanz läuft."
+        }
+      }
+    }
+  }
+}

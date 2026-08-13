@@ -1,0 +1,6 @@
+pytest-homeassistant-custom-component
+
+# homeassistant.helpers.llm imports the conversation component, which needs
+# these at import time (they are HA component requirements, not base deps)
+hassil
+home-assistant-intents

@@ -4,3 +4,7 @@ pytest-homeassistant-custom-component
 # these at import time (they are HA component requirements, not base deps)
 hassil
 home-assistant-intents
+
+# The tool tests put a Music Assistant config entry into hass; tearing it down
+# makes Home Assistant import the real MA integration.
+music-assistant-client

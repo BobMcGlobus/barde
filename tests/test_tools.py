@@ -29,7 +29,11 @@ from pytest_homeassistant_custom_component.common import (  # noqa: E402
     async_mock_service,
 )
 
-from custom_components.barde.const import DOMAIN, MA_DOMAIN  # noqa: E402
+from custom_components.barde.const import (  # noqa: E402
+    DOMAIN,
+    MA_DOMAIN,
+    MEDIA_TYPES,
+)
 
 PLAYER = "media_player.wohnzimmer"
 
@@ -173,10 +177,12 @@ async def test_play_falls_back_when_the_guessed_type_finds_nothing(
     )
 
     assert result["gespielt"] == "Hazbin Hotel"
+    # Dropping the media type widens the search to everything Barde knows,
+    # audiobooks and podcasts included.
     assert [(call["name"], call.get("media_type")) for call in searches] == [
         ("Hazbin Hotel Songs", ["track"]),
-        ("Hazbin Hotel Songs", None),
-        ("Hazbin Hotel", None),
+        ("Hazbin Hotel Songs", MEDIA_TYPES),
+        ("Hazbin Hotel", MEDIA_TYPES),
     ]
 
 

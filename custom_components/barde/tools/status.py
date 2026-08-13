@@ -77,6 +77,8 @@ class StatusTool(BardeTool):
             result["lautstärke"] = round(float(volume) * 100)
         if attributes.get("is_volume_muted"):
             result["stumm"] = True
+        if (remaining := runtime.timers.remaining(entity_id)) is not None:
+            result["einschlaftimer_min"] = remaining
         if members := attributes.get(ATTR_GROUP_MEMBERS):
             group = [
                 label(runtime, member) for member in members if member != entity_id

@@ -26,6 +26,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BardeConfigEntry) -> boo
     # Unregistering on unload is what makes a reload (options change) work.
     entry.async_on_unload(llm.async_register_api(hass, BardeAPI(hass, runtime)))
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    entry.async_on_unload(runtime.timers.async_cancel_all)
 
     _LOGGER.debug("Barde registered against Music Assistant entry %s", ma_entry_id)
     return True

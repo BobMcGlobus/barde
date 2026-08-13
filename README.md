@@ -69,6 +69,7 @@ acht Einzeltools. Alle Rückgaben bleiben klein (3–8 Felder).
 | `musik_abspielen` | Suchen, ranken, abspielen | `query`, `media_type`, `artist`, `player`, `enqueue`, `radio_mode`, `shuffle` |
 | `musik_suchen` | Suchen ohne Abspielen | `query`, `media_type`, `artist`, `limit`, `library_only` |
 | `podcast_folgen` | Einzelne Folgen auflisten, suchen, abspielen | `podcast`, `suche`, `anzahl`, `abspielen`, `player` |
+| `einschlaftimer` | Sleeptimer setzen, abbrechen, abfragen | `aktion`, `minuten`, `player`, `ausblenden` |
 | `musik_steuern` | Transport + Lautstärke | `action`, `player`, `wert` |
 | `lautsprecher_gruppieren` | Multiroom | `aktion`, `hauptplayer`, `player[]` |
 | `musik_uebernehmen` | Queue in anderen Raum | `nach`, `von`, `auto_play` |
@@ -130,6 +131,27 @@ das ist der Unterschied zwischen „spiel Kack- und Sachgeschichten" (so kommt e
 aus der Spracherkennung) und „Kack & Sachgeschichten" (so heißt es in der
 Bibliothek). Die Provider-Suche findet das nicht, ein Fuzzy-Vergleich auf
 unserer Seite schon.
+
+### Einschlaftimer
+
+Music Assistant hat keinen Sleeptimer — weder Action noch Queue-Flag noch
+Client-Kommando. Barde bringt deshalb einen eigenen mit:
+
+```
+"stell den Einschlaftimer auf 30 Minuten"  → aktion="setzen", minuten=30
+"mach in einer halben Stunde aus"          → dasselbe
+"wie lange läuft der Timer noch"           → aktion="status"
+"stopp den Einschlaftimer"                 → aktion="abbrechen"
+```
+
+Ohne Angabe sind es 30 Minuten. In der letzten Anderthalbminute wird die
+Lautstärke schrittweise heruntergefahren, dann pausiert (kein `stop`, damit
+„weiter" am nächsten Morgen noch geht) — und **danach die ursprüngliche
+Lautstärke wiederhergestellt**, damit du nicht am nächsten Tag vor einem
+stummen Lautsprecher stehst. `ausblenden=false` schaltet hart ab. Ein
+laufender Timer taucht auch in `was_laeuft` auf.
+
+Die Timer liegen im Speicher: ein Neustart von Home Assistant löscht sie.
 
 ### Wenn die Suche nichts findet
 

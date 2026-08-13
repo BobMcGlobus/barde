@@ -69,3 +69,10 @@ LIBRARY_FETCH_LIMIT: Final = 100
 
 # Assistant id used for the exposure check.
 CONVERSATION_ASSISTANT: Final = "conversation"
+
+# Sleep timer
+DEFAULT_SLEEP_MINUTES: Final = 30
+MAX_SLEEP_MINUTES: Final = 480
+FADE_SECONDS: Final = 90
+FADE_STEP_SECONDS: Final = 10
+FADE_MIN_VOLUME: Final = 0.15  # fraction of the original volume

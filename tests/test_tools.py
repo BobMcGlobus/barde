@@ -10,7 +10,7 @@ Skipped when Home Assistant is not installed (see tests/conftest.py).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -26,8 +26,10 @@ from homeassistant.core import (  # noqa: E402
     SupportsResponse,
 )
 from homeassistant.helpers import entity_registry as er, llm  # noqa: E402
+from homeassistant.util import dt as dt_util  # noqa: E402
 from pytest_homeassistant_custom_component.common import (  # noqa: E402
     MockConfigEntry,
+    async_fire_time_changed,
     async_mock_service,
 )
 
@@ -144,6 +146,7 @@ async def test_api_exposes_all_tools(hass: HomeAssistant, barde) -> None:
         "musik_steuern",
         "lautsprecher_gruppieren",
         "musik_uebernehmen",
+        "einschlaftimer",
         "was_laeuft",
     }
     assert "Barde" in api.api_prompt or "Lautsprecher" in api.api_prompt
@@ -464,6 +467,85 @@ async def test_control_steps_the_volume(hass: HomeAssistant, barde) -> None:
 
     assert result["lautstärke"] == 50
     assert calls[0].data["volume_level"] == 0.5
+
+
+async def test_sleep_timer_pauses_and_reports_the_end_time(
+    hass: HomeAssistant, barde
+) -> None:
+    hass.states.async_set(
+        PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.5}
+    )
+    paused = async_mock_service(hass, "media_player", "media_pause")
+
+    result = await _call_tool(
+        hass, "einschlaftimer", minuten=30, ausblenden=False, player="Wohnzimmer"
+    )
+    assert result["minuten"] == 30
+    assert ":" in result["endet_um"]
+
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=31))
+    await hass.async_block_till_done()
+
+    assert len(paused) == 1
+
+
+async def test_sleep_timer_can_be_cancelled(hass: HomeAssistant, barde) -> None:
+    hass.states.async_set(
+        PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.5}
+    )
+    paused = async_mock_service(hass, "media_player", "media_pause")
+
+    await _call_tool(
+        hass, "einschlaftimer", minuten=30, ausblenden=False, player="Wohnzimmer"
+    )
+    cancelled = await _call_tool(
+        hass, "einschlaftimer", aktion="abbrechen", player="Wohnzimmer"
+    )
+    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=31))
+    await hass.async_block_till_done()
+
+    assert cancelled["abgebrochen"] is True
+    assert paused == []
+
+
+async def test_sleep_timer_status_and_was_laeuft_agree(
+    hass: HomeAssistant, barde
+) -> None:
+    hass.states.async_set(
+        PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.5}
+    )
+    await _call_tool(hass, "einschlaftimer", minuten=45, player="Wohnzimmer")
+
+    status = await _call_tool(hass, "einschlaftimer", aktion="status")
+    playing = await _call_tool(hass, "was_laeuft", player="Wohnzimmer")
+
+    assert status["timer"] == [{"player": "Wohnzimmer", "verbleibend_min": 45}]
+    assert playing["einschlaftimer_min"] == 45
+
+
+async def test_sleep_timer_fades_down_and_restores_the_volume(
+    hass: HomeAssistant, barde
+) -> None:
+    hass.states.async_set(
+        PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.6}
+    )
+    volumes = async_mock_service(hass, "media_player", "volume_set")
+    paused = async_mock_service(hass, "media_player", "media_pause")
+
+    await _call_tool(hass, "einschlaftimer", minuten=10, player="Wohnzimmer")
+
+    # Walk past the start of the fade and through every step.
+    for offset in range(9, 22):
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(minutes=offset))
+        await hass.async_block_till_done()
+
+    levels = [call.data["volume_level"] for call in volumes]
+    fade, restore = levels[:-1], levels[-1]
+    assert len(fade) > 2, "expected a gradual fade, not one jump"
+    assert fade == sorted(fade, reverse=True), f"fade must fall: {fade}"
+    assert fade[0] < 0.6
+    assert len(paused) == 1
+    assert restore == 0.6
 
 
 async def test_status_without_a_player_lists_what_plays(

@@ -15,6 +15,7 @@ from .episodes import EpisodesTool
 from .group import GroupTool
 from .play import PlayTool
 from .search import SearchTool
+from .sleeptimer import SleepTimerTool
 from .status import StatusTool
 from .transfer import TransferTool
 
@@ -30,6 +31,7 @@ TOOLS = (
     ControlTool,
     GroupTool,
     TransferTool,
+    SleepTimerTool,
     StatusTool,
 )
 
@@ -46,6 +48,7 @@ __all__ = [
     "GroupTool",
     "PlayTool",
     "SearchTool",
+    "SleepTimerTool",
     "StatusTool",
     "TransferTool",
     "build_tools",

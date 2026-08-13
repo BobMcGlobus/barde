@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0 — unveröffentlicht
+
+**Neu: `einschlaftimer`.** Music Assistant hat keinen Sleeptimer, also bringt
+Barde einen mit — pro Player, setzen / abbrechen / abfragen. Standard sind 30
+Minuten. Zum Schluss wird die Lautstärke in Schritten heruntergefahren, dann
+pausiert (nicht gestoppt) und **die ursprüngliche Lautstärke
+wiederhergestellt**. `ausblenden=false` schaltet hart ab. Laufende Timer
+erscheinen auch in `was_laeuft`. Die Timer liegen im Speicher und überleben
+keinen Neustart.
+
 ## 0.2.0 — unveröffentlicht
 
 **Neu: `podcast_folgen` — einzelne Folgen.** Siebtes Tool, weil einzelne Folgen

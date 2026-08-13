@@ -61,6 +61,20 @@ def test_provider_of() -> None:
     assert provider_of("Rumours") == ""
 
 
+def test_provider_of_strips_the_instance_hash() -> None:
+    # Music Assistant addresses provider instances, not providers.
+    assert provider_of("tidal--gPQbwUfS://album/64370566") == "tidal"
+
+
+def test_provider_preference_matches_an_instance_uri() -> None:
+    candidates = [
+        Candidate("X", "qobuz--ab12://album/1", "album", provider="qobuz"),
+        Candidate("X", "tidal--gPQbwUfS://album/2", "album", provider="tidal"),
+    ]
+    ranked = rank(candidates, "X", provider_preference=["library", "tidal"])
+    assert ranked[0].uri.startswith("tidal--")
+
+
 def test_flatten_reads_name_uri_and_artist() -> None:
     candidates = flatten(SEARCH_RESPONSE)
     assert len(candidates) == 2

@@ -132,11 +132,56 @@ class MusicAssistantBridge:
                 return only
         return response
 
+    async def podcast_episodes(self, uri: str) -> list[dict[str, Any]]:
+        """Episodes of one podcast, as plain dicts.
+
+        The only place Barde reaches past the service actions. There is no
+        action for episodes — ``music_assistant.search`` cannot return them and
+        ``get_library`` does not list them — so this borrows the client the
+        Music Assistant integration already holds. That is private API: it is
+        contained here, guarded, and every failure becomes a BardeError.
+        """
+        client = self._client()
+        try:
+            podcast = await client.music.get_item_by_uri(uri)
+            episodes = await client.music.get_podcast_episodes(
+                podcast.item_id, podcast.provider
+            )
+        except Exception as err:  # noqa: BLE001 - foreign library, foreign errors
+            _LOGGER.debug("Episode lookup for %s failed: %s", uri, err)
+            raise BardeError(
+                f"Folgen konnten nicht geladen werden ({type(err).__name__}: {err})"
+            ) from err
+        return [_episode_dict(episode) for episode in episodes]
+
+    def _client(self) -> Any:
+        """Return the Music Assistant client of the entry we target."""
+        entry = self.hass.config_entries.async_get_entry(self.config_entry_id)
+        client = getattr(getattr(entry, "runtime_data", None), "mass", None)
+        if client is None:
+            raise BardeError(
+                "Kein Zugriff auf Music Assistant — läuft die Integration?"
+            )
+        return client
+
     async def _call(
         self, service: str, data: dict[str, Any], response: bool = False
     ) -> dict[str, Any]:
         """Call a MA action, mapping timeouts and HA errors to BardeError."""
         return await _async_call(self.hass, MA_DOMAIN, service, data, response=response)
+
+
+def _episode_dict(episode: Any) -> dict[str, Any]:
+    """Flatten a PodcastEpisode into the few fields Barde uses."""
+    released = getattr(getattr(episode, "metadata", None), "release_date", None)
+    return {
+        "name": getattr(episode, "name", None),
+        "uri": getattr(episode, "uri", None),
+        "position": getattr(episode, "position", 0),
+        "duration": getattr(episode, "duration", 0),
+        "fully_played": bool(getattr(episode, "fully_played", False)),
+        "released": released.isoformat() if hasattr(released, "isoformat") else None,
+    }
 
 
 async def async_media_player(

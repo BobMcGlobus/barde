@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0 — unveröffentlicht
+
+**Neu: `podcast_folgen` — einzelne Folgen.** Siebtes Tool, weil einzelne Folgen
+über die anderen schlicht nicht erreichbar sind:
+
+- „spiel die neueste Folge von X" → `abspielen=true`, sortiert nach
+  Erscheinungsdatum
+- „nenn mir die letzten zehn Folgen" → `anzahl=10`
+- „such die Ironman-Folge raus" → `suche='Ironman'`, optional direkt abspielen
+- Kennt Barde den Podcast nicht, nennt die Fehlermeldung die vorhandenen
+
+Dafür greift Barde erstmals an den Service-Actions vorbei: Folgen liefert
+weder `search` noch `get_library`, also wird der `MusicAssistantClient` der
+MA-Integration mitbenutzt (`music/podcasts/podcast_episodes`). Das ist private
+API — sie ist auf `ma.py` begrenzt, abgesichert, und ihr Fehlen ergibt eine
+saubere Meldung statt eines Absturzes.
+
+**Fix: `provider_preference` griff nie.** Music Assistant adressiert
+Provider-*Instanzen*: die Quelle heißt `tidal--gPQbwUfS`, nicht `tidal`. Der
+Instanz-Hash wird jetzt abgeschnitten — damit wirkt die Option, und `quelle`
+in den Antworten ist wieder lesbar.
+
 ## 0.1.2 — unveröffentlicht
 
 **Fix: `AttributeError: 'ComputedNameType' object has no attribute 'casefold'`.**

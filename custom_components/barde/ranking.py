@@ -55,9 +55,16 @@ def is_uri(value: str) -> bool:
 
 
 def provider_of(uri: str) -> str:
-    """Extract the provider prefix of a MA URI (``spotify://album/x``)."""
+    """Extract the provider domain of a MA URI.
+
+    Music Assistant addresses a *provider instance*, not a provider:
+    ``tidal--gPQbwUfS://album/1``. The instance hash is meaningless to the
+    user and to ``provider_preference``, so only the domain survives.
+    """
     head, sep, _ = uri.partition("://")
-    return head.lower() if sep else ""
+    if not sep:
+        return ""
+    return head.split("--", 1)[0].lower()
 
 
 @dataclass(frozen=True, slots=True)

@@ -72,6 +72,10 @@ class MediaFinder:
 
     async def async_from_library(self, media_type: str, query: str) -> list[Candidate]:
         """Match ``query`` against the library entries of one media type."""
+        return filter_by_name(await self.async_library_items(media_type), query)
+
+    async def async_library_items(self, media_type: str) -> list[Candidate]:
+        """Every library entry of one media type, unfiltered."""
         try:
             response = await self.runtime.ma.get_library(
                 media_type, limit=LIBRARY_FETCH_LIMIT
@@ -79,7 +83,7 @@ class MediaFinder:
         except BardeError as err:
             _LOGGER.debug("Library lookup for %s failed: %s", media_type, err)
             return []
-        return filter_by_name(from_library(response, media_type), query)
+        return from_library(response, media_type)
 
     async def _async_search(
         self,

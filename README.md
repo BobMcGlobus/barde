@@ -58,9 +58,9 @@ LLM-APIs** → „Barde" zusätzlich zu „Assist" anhaken.
 Alles Weitere läuft über **Konfigurieren** am Barde-Eintrag
 (siehe [Optionen](#optionen)).
 
-## Die sechs Tools
+## Die Tools
 
-Bewusst sechs. Jede Tool-Definition kostet Kontext in *jedem* Turn — die
+Bewusst wenige. Jede Tool-Definition kostet Kontext in *jedem* Turn — die
 Transport-Kommandos stecken deshalb in einem Tool mit `action`-Enum statt in
 acht Einzeltools. Alle Rückgaben bleiben klein (3–8 Felder).
 
@@ -68,6 +68,7 @@ acht Einzeltools. Alle Rückgaben bleiben klein (3–8 Felder).
 |---|---|---|
 | `musik_abspielen` | Suchen, ranken, abspielen | `query`, `media_type`, `artist`, `player`, `enqueue`, `radio_mode`, `shuffle` |
 | `musik_suchen` | Suchen ohne Abspielen | `query`, `media_type`, `artist`, `limit`, `library_only` |
+| `podcast_folgen` | Einzelne Folgen auflisten, suchen, abspielen | `podcast`, `suche`, `anzahl`, `abspielen`, `player` |
 | `musik_steuern` | Transport + Lautstärke | `action`, `player`, `wert` |
 | `lautsprecher_gruppieren` | Multiroom | `aktion`, `hauptplayer`, `player[]` |
 | `musik_uebernehmen` | Queue in anderen Raum | `nach`, `von`, `auto_play` |
@@ -104,7 +105,26 @@ auch ohne Angabe mitgesucht — Provider wie **Audiobookshelf** kommen damit ohn
 Extrabehandlung durch. Im Ranking stehen sie unter der Musik, damit „spiel
 Rumours" weiterhin das Album trifft und nicht ein gleichnamiges Hörbuch.
 
-Für diese beiden Typen fragt Barde zuerst die **Bibliothek** ab statt die
+Einzelne **Folgen** liegen hinter `podcast_folgen`:
+
+```
+"spiel die neueste Folge von Kack und Sachgeschichten"  → abspielen=true
+"nenn mir die letzten zehn Folgen"                      → anzahl=10
+"such die Ironman-Folge raus"                           → suche="Ironman"
+"spiel die Ironman-Folge, Teil 1"                       → suche + abspielen
+```
+
+Sortiert wird nach Erscheinungsdatum, die neueste zuerst. Bei `suche` zählt,
+wie viele der gesuchten Wörter im Folgentitel vorkommen — Zahlen inklusive,
+damit „Teil 1" und „Teil 2" auseinandergehen.
+
+Das ist die einzige Stelle, an der Barde an den Service-Actions vorbeigreift:
+Folgen liefert weder `music_assistant.search` noch `get_library`. Barde nutzt
+deshalb den `MusicAssistantClient`, den die MA-Integration ohnehin hält. Das
+ist private API — sie steckt gekapselt in `ma.py`, und wenn sie eines Tages
+wegbricht, gibt es eine Fehlermeldung statt eines Absturzes.
+
+Für Podcasts und Hörbücher fragt Barde zuerst die **Bibliothek** ab statt die
 Provider-Suche. Dort leben sie, und der Namensvergleich passiert dann lokal —
 das ist der Unterschied zwischen „spiel Kack- und Sachgeschichten" (so kommt es
 aus der Spracherkennung) und „Kack & Sachgeschichten" (so heißt es in der

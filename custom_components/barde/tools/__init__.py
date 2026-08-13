@@ -1,8 +1,9 @@
-"""The six Barde tools.
+"""The Barde tools.
 
-Six on purpose: every tool definition costs context in *every* Assist turn, so
-the transport commands live in one tool with an ``action`` enum instead of
-eight separate ones.
+Deliberately few: every tool definition costs context in *every* Assist turn,
+so the transport commands live in one tool with an ``action`` enum instead of
+eight separate ones. ``podcast_folgen`` is the one addition that earns its
+keep — single episodes are simply not reachable through the other tools.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .control import ControlTool
+from .episodes import EpisodesTool
 from .group import GroupTool
 from .play import PlayTool
 from .search import SearchTool
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
 TOOLS = (
     PlayTool,
     SearchTool,
+    EpisodesTool,
     ControlTool,
     GroupTool,
     TransferTool,
@@ -39,6 +42,7 @@ def build_tools(runtime: BardeRuntime) -> list[llm.Tool]:
 __all__ = [
     "TOOLS",
     "ControlTool",
+    "EpisodesTool",
     "GroupTool",
     "PlayTool",
     "SearchTool",

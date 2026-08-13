@@ -10,6 +10,8 @@ Skipped when Home Assistant is not installed (see tests/conftest.py).
 
 from __future__ import annotations
 
+from datetime import date
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -126,7 +128,7 @@ async def _call_tool(hass: HomeAssistant, name: str, **args: Any) -> dict[str, A
     )
 
 
-async def test_api_exposes_six_tools(hass: HomeAssistant, barde) -> None:
+async def test_api_exposes_all_tools(hass: HomeAssistant, barde) -> None:
     llm_context = llm.LLMContext(
         platform="test",
         context=Context(),
@@ -138,6 +140,7 @@ async def test_api_exposes_six_tools(hass: HomeAssistant, barde) -> None:
     assert {tool.name for tool in api.tools} == {
         "musik_abspielen",
         "musik_suchen",
+        "podcast_folgen",
         "musik_steuern",
         "lautsprecher_gruppieren",
         "musik_uebernehmen",
@@ -329,6 +332,126 @@ async def test_computed_name_alias_does_not_break_matching(
     )
 
     assert result["gespielt"] == "Hazbin Hotel"
+
+
+class _FakeEpisode:
+    """What music_assistant_client returns, reduced to what Barde reads."""
+
+    def __init__(self, name: str, position: int, released: str | None) -> None:
+        self.name = name
+        self.uri = f"abs://episode/{position}"
+        self.position = position
+        self.duration = 3600
+        self.fully_played = False
+        self.metadata = SimpleNamespace(
+            release_date=date.fromisoformat(released) if released else None
+        )
+
+
+class _FakeMusic:
+    def __init__(self, episodes: list[_FakeEpisode]) -> None:
+        self._episodes = episodes
+        self.asked_for: list[tuple[str, str]] = []
+
+    async def get_item_by_uri(self, uri: str) -> SimpleNamespace:
+        return SimpleNamespace(item_id="1", provider="library", uri=uri)
+
+    async def get_podcast_episodes(self, item_id: str, provider: str) -> list:
+        self.asked_for.append((item_id, provider))
+        return self._episodes
+
+
+def _register_client(hass: HomeAssistant, episodes: list[_FakeEpisode]) -> _FakeMusic:
+    """Attach a fake Music Assistant client to the MA config entry."""
+    music = _FakeMusic(episodes)
+    ma_entry = hass.config_entries.async_entries(MA_DOMAIN)[0]
+    ma_entry.runtime_data = SimpleNamespace(mass=SimpleNamespace(music=music))
+    return music
+
+
+PODCAST_LIBRARY = {
+    "podcast": [
+        {"name": "Kack & Sachgeschichten", "uri": "library://podcast/1"},
+        {"name": "KREWKAST", "uri": "library://podcast/2"},
+    ]
+}
+
+EPISODES = [
+    _FakeEpisode("Folge 41: Ironman, Teil 1", 41, "2026-07-25"),
+    _FakeEpisode("Folge 43: Kaffee", 43, "2026-08-08"),
+    _FakeEpisode("Folge 42: Ironman, Teil 2", 42, "2026-08-01"),
+]
+
+
+async def test_episodes_are_listed_newest_first(hass: HomeAssistant, barde) -> None:
+    _register_library(hass, PODCAST_LIBRARY)
+    _register_client(hass, EPISODES)
+
+    result = await _call_tool(
+        hass, "podcast_folgen", podcast="Kack- und Sachgeschichten", anzahl=2
+    )
+
+    assert result["podcast"] == "Kack & Sachgeschichten"
+    assert [folge["titel"] for folge in result["folgen"]] == [
+        "Folge 43: Kaffee",
+        "Folge 42: Ironman, Teil 2",
+    ]
+    assert result["anzahl"] == 3
+
+
+async def test_newest_episode_is_played(hass: HomeAssistant, barde) -> None:
+    _register_library(hass, PODCAST_LIBRARY)
+    _register_client(hass, EPISODES)
+    played = async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass,
+        "podcast_folgen",
+        podcast="Kack und Sachgeschichten",
+        abspielen=True,
+        player="Wohnzimmer",
+    )
+
+    assert result["gespielt"] == "Folge 43: Kaffee"
+    assert played[0].data["media_id"] == "abs://episode/43"
+
+
+async def test_a_named_episode_is_found_and_played(hass: HomeAssistant, barde) -> None:
+    _register_library(hass, PODCAST_LIBRARY)
+    _register_client(hass, EPISODES)
+    played = async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass,
+        "podcast_folgen",
+        podcast="Kack & Sachgeschichten",
+        suche="Ironman Teil 1",
+        abspielen=True,
+        player="Wohnzimmer",
+    )
+
+    assert result["gespielt"] == "Folge 41: Ironman, Teil 1"
+    assert played[0].data["media_id"] == "abs://episode/41"
+
+
+async def test_unknown_podcast_lists_what_exists(hass: HomeAssistant, barde) -> None:
+    _register_library(hass, PODCAST_LIBRARY)
+    _register_client(hass, EPISODES)
+
+    result = await _call_tool(hass, "podcast_folgen", podcast="Tatort")
+
+    assert "KREWKAST" in result["fehler"]
+
+
+async def test_missing_client_is_reported_not_raised(
+    hass: HomeAssistant, barde
+) -> None:
+    """The MA client is private API — its absence must stay survivable."""
+    _register_library(hass, PODCAST_LIBRARY)
+
+    result = await _call_tool(hass, "podcast_folgen", podcast="Kack & Sachgeschichten")
+
+    assert "fehler" in result
 
 
 async def test_control_steps_the_volume(hass: HomeAssistant, barde) -> None:

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import re
 from typing import Any
 
-from .matching import match_score, normalize
+from .matching import match_score, normalize, strip_query_filler
 
 # Response bucket -> media type. Music Assistant returns one list per type.
 RESULT_BUCKETS: dict[str, str] = {
@@ -26,13 +26,16 @@ RESULT_BUCKETS: dict[str, str] = {
 }
 
 # Used when the request did not name a media type. A spoken command rarely
-# means a single track when an album or playlist of the same name exists.
+# means a single track when an album or playlist of the same name exists, and
+# it means spoken word only when nothing musical matches.
 TYPE_PRIORITY: dict[str, int] = {
-    "playlist": 5,
-    "album": 4,
-    "artist": 3,
-    "track": 2,
-    "radio": 1,
+    "playlist": 6,
+    "album": 5,
+    "artist": 4,
+    "track": 3,
+    "radio": 2,
+    "audiobook": 1,
+    "podcast": 0,
 }
 
 LIBRARY_PROVIDER = "library"
@@ -158,6 +161,28 @@ def rank(
         candidate
         for _, candidate in sorted(enumerate(candidates), key=sort_key, reverse=True)
     ]
+
+
+def search_attempts(
+    query: str, media_type: str | None, artist: str | None
+) -> list[tuple[str, str | None, str | None]]:
+    """Plan the searches for one play request, most specific first.
+
+    Voice queries carry noise the library does not: a media type the model
+    guessed ("Hazbin Hotel Songs" as a *track*), an artist that is not credited
+    that way, or words like "Songs" that belong to the sentence rather than to
+    the title. Each of those gets dropped in turn — the caller only runs the
+    next attempt when the previous one came back empty.
+    """
+    attempts: list[tuple[str, str | None, str | None]] = [(query, media_type, artist)]
+    if media_type:
+        attempts.append((query, None, artist))
+    if artist:
+        attempts.append((query, None, None))
+    cleaned = strip_query_filler(query)
+    if cleaned and cleaned != query:
+        attempts.append((cleaned, None, None))
+    return attempts
 
 
 def _artist_bonus(candidate: Candidate, artist: str | None) -> int:

@@ -91,11 +91,39 @@ zurückmelden, was tatsächlich läuft:
 ```
 
 Reihenfolge: exakter Namenstreffer → angeforderter `media_type` → Standardordnung
-(playlist > album > artist > track > radio) → passender Künstler →
-`provider_preference` → Bibliothek vor Streaming → Namensähnlichkeit.
+(playlist > album > artist > track > radio > audiobook > podcast) → passender
+Künstler → `provider_preference` → Bibliothek vor Streaming → Namensähnlichkeit.
 
 `alternativen` gibt dem Modell die Chance, von sich aus „ich hab X gespielt, es
 gäbe auch noch …" zu sagen, ohne einen zweiten Tool-Call zu brauchen.
+
+### Hörbücher und Podcasts
+
+`audiobook` und `podcast` sind gleichberechtigte `media_type`-Werte und werden
+auch ohne Angabe mitgesucht — Provider wie **Audiobookshelf** kommen damit ohne
+Extrabehandlung durch. Im Ranking stehen sie unter der Musik, damit „spiel
+Rumours" weiterhin das Album trifft und nicht ein gleichnamiges Hörbuch.
+
+### Wenn die Suche nichts findet
+
+Sprachanfragen tragen Rauschen, das die Bibliothek nicht kennt. Statt sofort
+aufzugeben, lockert `musik_abspielen` die Anfrage schrittweise — und zwar nur
+bei leerem Ergebnis, jeder Schritt kostet eine Runde:
+
+1. wie angefragt
+2. ohne den geratenen `media_type` (das Modell tippt gern auf `track`)
+3. ohne `artist` (Music Assistant baut daraus `"Künstler - Titel"`, ein
+   falscher Credit killt die Suche)
+4. ohne Füllwörter: „Hazbin Hotel Songs" → „Hazbin Hotel"
+
+### Fehlerverhalten
+
+Ein Tool antwortet immer. Home Assistants Chat-Log fängt bei Tool-Calls nur
+`HomeAssistantError` und `vol.Invalid` ab — jede andere Exception beendet den
+kompletten Assist-Lauf mit „Unexpected error during intent recognition". Music
+Assistant wiederum lässt in `handle_search` einen rohen `MusicAssistantError`
+durch. Barde fängt deshalb alles, loggt es mit Traceback und gibt dem Modell
+ein `{"fehler": …}`, über das es sprechen kann.
 
 ## Player-Auflösung
 

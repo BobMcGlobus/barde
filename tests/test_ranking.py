@@ -6,6 +6,7 @@ from custom_components.barde.ranking import (
     is_uri,
     provider_of,
     rank,
+    search_attempts,
 )
 
 SEARCH_RESPONSE = {
@@ -131,3 +132,54 @@ def test_ranking_is_stable_for_equal_candidates() -> None:
 
 def test_empty_response_ranks_to_nothing() -> None:
     assert rank(flatten(None), "irgendwas") == []
+
+
+def test_flatten_reads_audiobooks_and_podcasts() -> None:
+    candidates = flatten(
+        {
+            "audiobooks": [
+                {"name": "Der Hobbit", "uri": "audiobookshelf://audiobook/7"}
+            ],
+            "podcasts": [{"name": "Lage der Nation", "uri": "abs://podcast/3"}],
+        }
+    )
+    assert {c.media_type for c in candidates} == {"audiobook", "podcast"}
+    assert candidates[0].provider == "audiobookshelf"
+
+
+def test_music_outranks_spoken_word_without_a_requested_type() -> None:
+    candidates = [
+        _candidate("Der Hobbit", "audiobook", provider="audiobookshelf"),
+        _candidate("Der Hobbit", "album"),
+    ]
+    assert rank(candidates, "Der Hobbit")[0].media_type == "album"
+
+
+def test_requested_audiobook_wins_over_album() -> None:
+    candidates = [
+        _candidate("Der Hobbit", "album"),
+        _candidate("Der Hobbit", "audiobook", provider="audiobookshelf"),
+    ]
+    ranked = rank(candidates, "Der Hobbit", media_type="audiobook")
+    assert ranked[0].media_type == "audiobook"
+
+
+def test_search_attempts_only_the_request_when_nothing_to_loosen() -> None:
+    assert search_attempts("Rumours", None, None) == [("Rumours", None, None)]
+
+
+def test_search_attempts_drop_media_type_then_artist() -> None:
+    assert search_attempts("Rumours", "track", "Fleetwood Mac") == [
+        ("Rumours", "track", "Fleetwood Mac"),
+        ("Rumours", None, "Fleetwood Mac"),
+        ("Rumours", None, None),
+    ]
+
+
+def test_search_attempts_strip_filler_words_last() -> None:
+    # The reported failure: "Hazbin Hotel Songs" guessed as a track.
+    assert search_attempts("Hazbin Hotel Songs", "track", None) == [
+        ("Hazbin Hotel Songs", "track", None),
+        ("Hazbin Hotel Songs", None, None),
+        ("Hazbin Hotel", None, None),
+    ]

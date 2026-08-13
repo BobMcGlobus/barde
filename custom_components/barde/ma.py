@@ -14,6 +14,7 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+import voluptuous as vol
 
 from .const import MA_DOMAIN, MEDIA_PLAYER_DOMAIN, SERVICE_TIMEOUT
 from .exceptions import BardeError
@@ -169,7 +170,15 @@ async def _async_call(
             f"{domain}.{service} hat nicht innerhalb von "
             f"{SERVICE_TIMEOUT} Sekunden geantwortet"
         ) from err
+    except vol.Invalid as err:
+        _LOGGER.debug("%s.%s rejected %s: %s", domain, service, data, err)
+        raise BardeError(f"{domain}.{service}: ungültige Parameter ({err})") from err
     except HomeAssistantError as err:
         _LOGGER.debug("%s.%s failed: %s", domain, service, err)
         raise BardeError(f"{domain}.{service}: {err}") from err
+    except Exception as err:  # noqa: BLE001
+        # music_assistant.search & friends are not wrapped on the MA side, so a
+        # MusicAssistantError arrives here raw — and raw is fatal for the run.
+        _LOGGER.exception("%s.%s raised unexpectedly for %s", domain, service, data)
+        raise BardeError(f"{domain}.{service}: {type(err).__name__}: {err}") from err
     return result if isinstance(result, dict) else {}

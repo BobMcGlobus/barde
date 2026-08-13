@@ -10,7 +10,14 @@ import voluptuous as vol
 from ..const import DEFAULT_SEARCH_LIMIT, ENQUEUE_MODES, MEDIA_TYPES
 from ..exceptions import NothingFound
 from ..ma import async_media_player
-from ..ranking import Candidate, flatten, is_uri, provider_of, rank
+from ..ranking import (
+    Candidate,
+    flatten,
+    is_uri,
+    provider_of,
+    rank,
+    search_attempts,
+)
 from ..resolver import label, resolve_player
 from .base import BardeTool
 
@@ -20,11 +27,14 @@ class PlayTool(BardeTool):
 
     name = "musik_abspielen"
     description = (
-        "Spielt Musik auf einem Lautsprecher ab. Nutze dieses Tool für jede "
-        "Anfrage, Musik zu starten — 'spiel Rumours', 'leg die Kochmusik auf', "
-        "'spiel Daft Punk in der Küche', 'mach Radio an'. query ist der "
-        "gesuchte Name (Song, Album, Künstler, Playlist oder Sender). "
-        "media_type nur setzen, wenn der Nutzer den Typ nennt ('das Album X'). "
+        "Spielt Musik, Hörbücher oder Podcasts auf einem Lautsprecher ab. "
+        "Nutze dieses Tool für jede Anfrage, etwas zu starten — 'spiel "
+        "Rumours', 'leg die Kochmusik auf', 'spiel Daft Punk in der Küche', "
+        "'mach Radio an', 'lies mir Der Hobbit vor', 'spiel die neue Folge "
+        "von <Podcast>'. query ist der gesuchte Name (Song, Album, Künstler, "
+        "Playlist, Sender, Hörbuch oder Podcast). "
+        "media_type nur setzen, wenn der Nutzer den Typ nennt ('das Album X', "
+        "'das Hörbuch X', 'der Podcast X'). "
         "artist zur Unterscheidung ('Rumours von Fleetwood Mac'). player ist "
         "der Raum- oder Lautsprechername im Klartext; weglassen, wenn kein "
         "Raum genannt wurde — dann wird der Raum des Sprechers genommen. "
@@ -62,19 +72,7 @@ class PlayTool(BardeTool):
             )
             alternatives = 0
         else:
-            response = await runtime.ma.search(
-                query,
-                media_types=[media_type] if media_type else MEDIA_TYPES,
-                artist=artist,
-                limit=DEFAULT_SEARCH_LIMIT,
-            )
-            ranked = rank(
-                flatten(response),
-                query,
-                media_type=media_type,
-                provider_preference=runtime.provider_preference,
-                artist=artist,
-            )
+            ranked = await self._async_search_with_fallbacks(query, media_type, artist)
             if not ranked:
                 raise NothingFound(
                     f"Nichts gefunden für '{query}'"
@@ -106,3 +104,40 @@ class PlayTool(BardeTool):
         if chosen.artist:
             result["künstler"] = chosen.artist
         return result
+
+    async def _async_search_with_fallbacks(
+        self, query: str, media_type: str | None, artist: str | None
+    ) -> list[Candidate]:
+        """Search as asked, then loosen the request instead of giving up.
+
+        Every retry costs a round trip to Music Assistant, so the next attempt
+        only runs when the previous one came back empty.
+        """
+        for attempt_query, attempt_type, attempt_artist in search_attempts(
+            query, media_type, artist
+        ):
+            ranked = await self._async_search(
+                attempt_query, attempt_type, attempt_artist
+            )
+            if ranked:
+                return ranked
+        return []
+
+    async def _async_search(
+        self, query: str, media_type: str | None, artist: str | None
+    ) -> list[Candidate]:
+        """Run one search and rank what comes back."""
+        runtime = self.runtime
+        response = await runtime.ma.search(
+            query,
+            media_types=[media_type] if media_type else MEDIA_TYPES,
+            artist=artist,
+            limit=DEFAULT_SEARCH_LIMIT,
+        )
+        return rank(
+            flatten(response),
+            query,
+            media_type=media_type,
+            provider_preference=runtime.provider_preference,
+            artist=artist,
+        )

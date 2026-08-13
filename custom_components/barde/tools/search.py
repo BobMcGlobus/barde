@@ -17,8 +17,9 @@ class SearchTool(BardeTool):
 
     name = "musik_suchen"
     description = (
-        "Sucht Musik, ohne sie abzuspielen. Für Fragen wie 'was hast du von "
-        "Portishead', 'welche Alben gibt es von X' oder wenn unklar ist, was "
+        "Sucht Musik, Hörbücher und Podcasts, ohne sie abzuspielen. Für Fragen "
+        "wie 'was hast du von Portishead', 'welche Hörbücher gibt es', "
+        "'welche Alben gibt es von X' oder wenn unklar ist, was "
         "der Nutzer meint und du nachfragen willst. Gibt pro Treffer Name, "
         "Künstler, Typ und uri zurück. Die uri kann direkt als query an "
         "musik_abspielen übergeben werden, um genau diesen Treffer zu "

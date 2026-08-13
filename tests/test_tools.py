@@ -1,0 +1,292 @@
+"""End-to-end tool behaviour against a real hass.
+
+The rule these tests protect: a tool must always answer. Home Assistant's chat
+log only recovers from ``HomeAssistantError`` and ``vol.Invalid`` — anything
+else aborts the whole Assist run with "Unexpected error during intent
+recognition", which is what happened in the field.
+
+Skipped when Home Assistant is not installed (see tests/conftest.py).
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+pytest.importorskip("homeassistant")
+
+from homeassistant.config_entries import ConfigEntryState  # noqa: E402
+from homeassistant.core import (  # noqa: E402
+    Context,
+    HomeAssistant,
+    ServiceCall,
+    SupportsResponse,
+)
+from homeassistant.helpers import entity_registry as er, llm  # noqa: E402
+from pytest_homeassistant_custom_component.common import (  # noqa: E402
+    MockConfigEntry,
+    async_mock_service,
+)
+
+from custom_components.barde.const import DOMAIN, MA_DOMAIN  # noqa: E402
+
+PLAYER = "media_player.wohnzimmer"
+
+EMPTY_RESULT: dict[str, list] = {
+    "artists": [],
+    "albums": [],
+    "tracks": [],
+    "playlists": [],
+    "radio": [],
+    "audiobooks": [],
+    "podcasts": [],
+}
+
+
+def _result(**buckets: list[dict[str, Any]]) -> dict[str, list]:
+    return {**EMPTY_RESULT, **buckets}
+
+
+ALBUM_HIT = _result(
+    albums=[
+        {
+            "name": "Hazbin Hotel",
+            "uri": "library://album/12",
+            "media_type": "album",
+            "artists": [{"name": "Sam Haft"}],
+        }
+    ]
+)
+
+
+@pytest.fixture(autouse=True)
+def _enable_custom_integrations(enable_custom_integrations: None) -> None:
+    """Let hass load custom_components/barde."""
+
+
+@pytest.fixture
+async def barde(hass: HomeAssistant) -> MockConfigEntry:
+    """Set up a Barde entry with one Music Assistant player."""
+    ma_entry = MockConfigEntry(domain=MA_DOMAIN, title="Music Assistant")
+    ma_entry.add_to_hass(hass)
+    ma_entry.mock_state(hass, ConfigEntryState.LOADED)
+
+    er.async_get(hass).async_get_or_create(
+        "media_player",
+        MA_DOMAIN,
+        "player-1",
+        config_entry=ma_entry,
+        suggested_object_id="wohnzimmer",
+    )
+    hass.states.async_set(PLAYER, "idle", {"friendly_name": "Wohnzimmer"})
+
+    entry = MockConfigEntry(domain=DOMAIN, title="Barde")
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+def _register_search(
+    hass: HomeAssistant, responses: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Register a fake music_assistant.search; returns the recorded calls."""
+    calls: list[dict[str, Any]] = []
+
+    async def handler(call: ServiceCall) -> dict[str, Any]:
+        calls.append(dict(call.data))
+        return responses.pop(0) if responses else EMPTY_RESULT
+
+    hass.services.async_register(
+        MA_DOMAIN, "search", handler, supports_response=SupportsResponse.ONLY
+    )
+    return calls
+
+
+async def _call_tool(hass: HomeAssistant, name: str, **args: Any) -> dict[str, Any]:
+    """Invoke a Barde tool the way a conversation agent would."""
+    llm_context = llm.LLMContext(
+        platform="test",
+        context=Context(),
+        language="de",
+        assistant="conversation",
+        device_id=None,
+    )
+    api = await llm.async_get_api(hass, DOMAIN, llm_context)
+    tool = next(candidate for candidate in api.tools if candidate.name == name)
+    return await tool.async_call(
+        hass,
+        llm.ToolInput(tool_name=name, tool_args=args),
+        api.llm_context,
+    )
+
+
+async def test_api_exposes_six_tools(hass: HomeAssistant, barde) -> None:
+    llm_context = llm.LLMContext(
+        platform="test",
+        context=Context(),
+        language="de",
+        assistant="conversation",
+        device_id=None,
+    )
+    api = await llm.async_get_api(hass, DOMAIN, llm_context)
+    assert {tool.name for tool in api.tools} == {
+        "musik_abspielen",
+        "musik_suchen",
+        "musik_steuern",
+        "lautsprecher_gruppieren",
+        "musik_uebernehmen",
+        "was_laeuft",
+    }
+    assert "Barde" in api.api_prompt or "Lautsprecher" in api.api_prompt
+
+
+async def test_play_starts_the_ranked_album(hass: HomeAssistant, barde) -> None:
+    _register_search(hass, [ALBUM_HIT])
+    played = async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Hazbin Hotel", player="Wohnzimmer"
+    )
+
+    assert result["gespielt"] == "Hazbin Hotel"
+    assert result["typ"] == "album"
+    assert len(played) == 1
+    assert played[0].data["media_id"] == "library://album/12"
+    assert played[0].data["entity_id"] == PLAYER
+
+
+async def test_play_falls_back_when_the_guessed_type_finds_nothing(
+    hass: HomeAssistant, barde
+) -> None:
+    """The reported failure: 'Hazbin Hotel Songs' guessed as a track."""
+    searches = _register_search(hass, [EMPTY_RESULT, EMPTY_RESULT, ALBUM_HIT])
+    async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass,
+        "musik_abspielen",
+        query="Hazbin Hotel Songs",
+        media_type="track",
+        player="Wohnzimmer",
+    )
+
+    assert result["gespielt"] == "Hazbin Hotel"
+    assert [(call["name"], call.get("media_type")) for call in searches] == [
+        ("Hazbin Hotel Songs", ["track"]),
+        ("Hazbin Hotel Songs", None),
+        ("Hazbin Hotel", None),
+    ]
+
+
+async def test_play_survives_a_foreign_exception_from_music_assistant(
+    hass: HomeAssistant, barde
+) -> None:
+    """MusicAssistantError is not a HomeAssistantError — it must not escape."""
+
+    async def handler(call: ServiceCall) -> dict[str, Any]:
+        raise RuntimeError("MA exploded")
+
+    hass.services.async_register(
+        MA_DOMAIN, "search", handler, supports_response=SupportsResponse.ONLY
+    )
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Rumours", player="Wohnzimmer"
+    )
+
+    assert "fehler" in result
+    assert "MA exploded" in result["fehler"]
+
+
+async def test_play_reports_an_unknown_room_with_alternatives(
+    hass: HomeAssistant, barde
+) -> None:
+    _register_search(hass, [ALBUM_HIT])
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Rumours", player="Dachboden"
+    )
+
+    assert "fehler" in result
+    assert result["verfügbar"] == ["Wohnzimmer"]
+
+
+async def test_play_reports_when_nothing_is_found(hass: HomeAssistant, barde) -> None:
+    _register_search(hass, [])
+
+    result = await _call_tool(
+        hass, "musik_abspielen", query="Gibtsnicht", player="Wohnzimmer"
+    )
+
+    assert "fehler" in result
+
+
+async def test_search_returns_audiobooks(hass: HomeAssistant, barde) -> None:
+    _register_search(
+        hass,
+        [
+            _result(
+                audiobooks=[
+                    {
+                        "name": "Der Hobbit",
+                        "uri": "audiobookshelf://audiobook/7",
+                        "media_type": "audiobook",
+                    }
+                ]
+            )
+        ],
+    )
+
+    result = await _call_tool(hass, "musik_suchen", query="Der Hobbit")
+
+    assert result["treffer"][0]["typ"] == "audiobook"
+    assert result["treffer"][0]["quelle"] == "audiobookshelf"
+
+
+async def test_control_steps_the_volume(hass: HomeAssistant, barde) -> None:
+    hass.states.async_set(
+        PLAYER, "playing", {"friendly_name": "Wohnzimmer", "volume_level": 0.4}
+    )
+    calls = async_mock_service(hass, "media_player", "volume_set")
+
+    result = await _call_tool(hass, "musik_steuern", action="lauter")
+
+    assert result["lautstärke"] == 50
+    assert calls[0].data["volume_level"] == 0.5
+
+
+async def test_status_without_a_player_lists_what_plays(
+    hass: HomeAssistant, barde
+) -> None:
+    hass.states.async_set(
+        PLAYER,
+        "playing",
+        {
+            "friendly_name": "Wohnzimmer",
+            "media_title": "Get Lucky",
+            "media_artist": "Daft Punk",
+        },
+    )
+
+    result = await _call_tool(hass, "was_laeuft")
+
+    assert result["laeuft"] is True
+    assert result["player"][0]["titel"] == "Get Lucky"
+
+
+async def test_unknown_arguments_do_not_raise(hass: HomeAssistant, barde) -> None:
+    _register_search(hass, [ALBUM_HIT])
+    async_mock_service(hass, MA_DOMAIN, "play_media")
+
+    result = await _call_tool(
+        hass,
+        "musik_abspielen",
+        query="Hazbin Hotel",
+        player="Wohnzimmer",
+        erfunden="was das Modell sich ausgedacht hat",
+        artist="",
+    )
+
+    assert result["gespielt"] == "Hazbin Hotel"

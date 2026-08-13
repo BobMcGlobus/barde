@@ -32,7 +32,15 @@ class BardeTool(llm.Tool):
         tool_input: llm.ToolInput,
         llm_context: llm.LLMContext,
     ) -> dict[str, Any]:
-        """Run the tool; never raise into the conversation agent."""
+        """Run the tool; never raise into the conversation agent.
+
+        The conversation chat log only recovers from ``HomeAssistantError`` and
+        ``vol.Invalid`` — anything else aborts the whole Assist run with
+        "Unexpected error during intent recognition". Music Assistant's own
+        actions are not fully wrapped either (``handle_search`` lets
+        ``MusicAssistantError`` through), so everything is caught here and
+        handed to the model as a result it can talk about.
+        """
         try:
             args = self._validate(tool_input.tool_args)
         except vol.Invalid as err:
@@ -50,6 +58,9 @@ class BardeTool(llm.Tool):
         except HomeAssistantError as err:
             _LOGGER.debug("%s failed: %s", self.name, err)
             return {"fehler": str(err)}
+        except Exception as err:  # noqa: BLE001 - see docstring
+            _LOGGER.exception("%s raised unexpectedly for args %s", self.name, args)
+            return {"fehler": f"Interner Fehler ({type(err).__name__}): {err}"}
 
     def _validate(self, raw: dict[str, Any]) -> dict[str, Any]:
         """Apply defaults and drop what the model made up.

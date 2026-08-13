@@ -43,10 +43,18 @@ KNOWN_PROVIDERS: Final = [
     "tunein",
 ]
 
-# Media types Barde offers to the model. Music Assistant additionally knows
-# audiobook/podcast/folder — deliberately left out, they are not what voice
-# commands in this house are about.
-MEDIA_TYPES: Final = ["track", "album", "artist", "playlist", "radio"]
+# Media types Barde offers to the model, and searches when the request does
+# not name one. Audiobook and podcast come from providers like Audiobookshelf;
+# they rank below music so "spiel Rumours" still lands on the album.
+MEDIA_TYPES: Final = [
+    "track",
+    "album",
+    "artist",
+    "playlist",
+    "radio",
+    "audiobook",
+    "podcast",
+]
 
 ENQUEUE_MODES: Final = ["play", "replace", "next", "add"]
 

@@ -72,6 +72,26 @@ _FILLER_WORDS = frozenset(
     }
 )
 
+# Words that describe the *request*, not the title. "Spiel Hazbin Hotel Songs"
+# has to become a search for "Hazbin Hotel" when the literal phrase finds
+# nothing.
+_QUERY_FILLER = frozenset(
+    {
+        "songs",
+        "song",
+        "lieder",
+        "lied",
+        "titel",
+        "tracks",
+        "musik",
+        "music",
+        "etwas",
+        "was",
+        "irgendwas",
+        "von",
+    }
+)
+
 # Below this the match is treated as "no match" rather than a bad guess.
 MATCH_THRESHOLD = 0.6
 
@@ -96,6 +116,16 @@ def core_form(text: str) -> str:
     """
     words = [word for word in tokenize(text) if word not in _FILLER_WORDS]
     return " ".join(words) if words else normalize(text)
+
+
+def strip_query_filler(text: str) -> str:
+    """Drop generic request words from a search query.
+
+    Keeps the original spelling of what is left; returns an empty string when
+    nothing would remain.
+    """
+    words = [word for word in text.split() if normalize(word) not in _QUERY_FILLER]
+    return " ".join(words).strip()
 
 
 def match_score(query: str, candidate: str) -> float:

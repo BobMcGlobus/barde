@@ -6,6 +6,7 @@ from custom_components.barde.matching import (
     core_form,
     match_score,
     normalize,
+    strip_query_filler,
 )
 
 
@@ -53,6 +54,19 @@ def test_best_match_picks_the_closer_alias() -> None:
 def test_best_match_returns_none_below_threshold() -> None:
     candidates = {"media_player.bad": ["Bad", "Badezimmer"]}
     assert best_match("Dachboden", candidates) is None
+
+
+def test_strip_query_filler_removes_request_words() -> None:
+    assert strip_query_filler("Hazbin Hotel Songs") == "Hazbin Hotel"
+    assert strip_query_filler("Musik von Daft Punk") == "Daft Punk"
+
+
+def test_strip_query_filler_keeps_original_spelling() -> None:
+    assert strip_query_filler("Kochmusik") == "Kochmusik"
+
+
+def test_strip_query_filler_can_empty_the_query() -> None:
+    assert strip_query_filler("irgendwas Musik") == ""
 
 
 def test_best_match_prefers_exact_over_substring() -> None:
